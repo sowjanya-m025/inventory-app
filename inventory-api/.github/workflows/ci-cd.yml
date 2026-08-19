@@ -1,0 +1,74 @@
+name: CI/CD Pipeline
+
+# Runs on every push and pull request targeting main.
+# Test job always runs. Build job only runs after tests pass AND
+# only on pushes to main (not PRs) — no point building an image
+# from unreviewed code.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        run: pytest tests/ -v
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test  # only builds if tests pass
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false  # flip to true + add registry login below once you have a registry (Docker Hub, GHCR, etc.)
+          tags: inventory-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Deployment stage (commented out — wire up once you pick a host) ---
+      # Example for deploying to Render/Railway/Fly.io via their CLI,
+      # or pushing to a container registry with:
+      #
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #
+      # - name: Push image
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: yourusername/inventory-api:latest
