@@ -6,6 +6,11 @@ for CI, where spinning up Postgres for every run is slower and more brittle.
 The production app still uses Postgres (see app/database.py) — this
 override only applies inside the test session.
 """
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
